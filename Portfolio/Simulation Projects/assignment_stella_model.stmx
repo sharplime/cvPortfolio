@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xmile version="1.0" xmlns="http://docs.oasis-open.org/xmile/ns/XMILE/v1.0" xmlns:isee="http://iseesystems.com/XMILE">
+	<header>
+		<smile version="1.0" namespace="std, isee"/>
+		<name>assignment_stella_model</name>
+		<uuid>28b6aeda-60bc-4ad9-9f46-2f4237fe4e4f</uuid>
+		<vendor>isee systems, inc.</vendor>
+		<product version="1.1.2" isee:build_number="0763" isee:saved_by_v1="true" lang="en">Stella Professional</product>
+	</header>
+	<sim_specs isee:simulation_delay="0.0345238" method="Euler" time_units="Days" isee:pause_after_rates="false" isee:instantaneous_flows="false">
+		<start>1</start>
+		<stop>84</stop>
+		<dt reciprocal="true">1</dt>
+	</sim_specs>
+	<isee:prefs show_module_prefix="true" layer="map" saved_runs="5"/>
+	<model_units>
+		<unit name="Liters">
+			<eqn/>
+			<alias>l</alias>
+			<alias>liter</alias>
+		</unit>
+		<unit name="Days">
+			<eqn/>
+			<alias>day</alias>
+		</unit>
+	</model_units>
+	<isee:sensi_specs run="false" method="multivariate" runs="0"/>
+	<model>
+		<variables>
+			<stock name="Groceries in Fridge">
+				<doc>The groceries in the fridge is measured in volume (liters), as is every flow of groceries for consistency. Groceries being purchased are given in terms of the volume in the fridge (in Liters) they will occupy, as is waste and consumption (which is measured in liters of fridge space that the groceries used to occupy in the fridge). 
+
+Every liter of groceries is considered the same as any other for consumption, purchase, and waste. 
+
+The fridge starts empty and cannot exceed its maximum capacity</doc>
+				<eqn>0</eqn>
+				<inflow>A&apos;s_grocerie_purchases</inflow>
+				<inflow>B&apos;s_grocerie_purchases</inflow>
+				<outflow>consumption</outflow>
+				<outflow>Waste</outflow>
+				<non_negative/>
+				<units>liter</units>
+			</stock>
+			<flow name="consumption">
+				<doc>This is the consumption of the groceries by all roommates. This is calculated for all roommates together to represent the total consumption of all roommates, if they shared their groceries. 
+
+In reality, they do not share groceries for the system being modelled, however this simplification does not take away from the point of the model. This is the best case scenario for consumption. Even if all the roommates could eat anything in the shared fridge. If there is waste for the best case, then there would be more waste in other cases. 
+
+As this is the maximum consumption possible, if there are fewer groceries than could be consumed, as much as possible is consumed. The problems from a lack of consumption or lack of resources is beyond the scope of this model.
+
+Consumption occurs every day, according to the consumption rate. </doc>
+				<eqn>&quot;maximum_consumption_rate/day&quot;</eqn>
+				<non_negative/>
+				<units>liters/day</units>
+			</flow>
+			<aux name="maximum\nconsumption rate/day">
+				<doc>Function:
+This is how many liters of groceries can consumed per day for A and B. 
+
+Explanation:
+This does not represent how many groceries that are necessarily going to be consumed, merely how much can be consumed to reduce waste in a surplus of groceries. </doc>
+				<eqn>15</eqn>
+				<units>liters</units>
+			</aux>
+			<flow name="Waste">
+				<doc>If it is Saturday, then everything that is in the &apos;Groceries in Fridge&apos; stock would be emptied into the &apos;Total Waste&apos; Stock. 
+
+This is representing how excess groceries expire and are wasted.</doc>
+				<eqn>IF  (TIME+1)/7 = INT((TIME+1)/7)
+THEN 999
+ELSE 0</eqn>
+				<non_negative/>
+				<units>liters/day</units>
+			</flow>
+			<stock name="Total Groceries Wasted">
+				<doc>Function:
+This the volume of food that is wasted in total from this system for the given time period. 
+
+Explanation:
+This allows us to create a visual representation of how waste is increasing in the model, also allowing the audience to see the long-term costs of the food waste. </doc>
+				<eqn>0</eqn>
+				<inflow>Waste</inflow>
+				<non_negative/>
+				<units>liter</units>
+			</stock>
+			<aux name="fridge capacity">
+				<doc>The total volume capacity for the shared fridge (200L). </doc>
+				<eqn>200</eqn>
+				<units>liter</units>
+			</aux>
+			<flow name="A's grocerie purchases">
+				<doc>Function:
+This is A&apos;s inflow of groceries into the fridge.
+
+Explanation:
+The logic for calculating the amount of the total inflow is in the converter, &apos;groceries to buy for A and B&apos;. As A and B act identically, this inflow (and B&apos;s) are just 0.5 times that of the &apos;groceries to buy for A and B&apos;.
+</doc>
+				<eqn>groceries_to_buy_for_A_and_B*0.5</eqn>
+				<non_negative/>
+				<units>liters/day</units>
+			</flow>
+			<flow name="B's grocerie purchases">
+				<doc>See &apos;A&apos;s grocerie purchase&apos;</doc>
+				<eqn>groceries_to_buy_for_A_and_B*0.5</eqn>
+				<non_negative/>
+				<units>liters/day</units>
+			</flow>
+			<aux name="groceries to buy\nfor A and B">
+				<doc>Function:
+Calculates the total inflow, before it is evenly split between A and B&apos;s grocerie purchases. 
+
+Explanation:
+This is 0 on all days except Sunday (the 7th day in this model).
+The first day, this would be the necessary groceries for both A and B.
+From here, the value increases every Sunday as A and B buy more groceries, capping off at a maximum of 200L of groceries being purchased on any one day.  </doc>
+				<eqn>IF INT(TIME)/7 &lt;&gt; INT(TIME/7)
+THEN 0
+ELSE
+IF INT(TIME) = 7 THEN &quot;necessary_groceries_for_1_person/week&quot;*2
+ELSE
+IF groceries_bought_for_A_and_B_last_week &gt;=  fridge_capacity
+THEN fridge_capacity
+ELSE
+MIN(groceries_bought_for_A_and_B_last_week+additional_groceries_to_buy, fridge_capacity)</eqn>
+				<units>liter</units>
+			</aux>
+			<aux name="groceries bought\nfor A and B last week">
+				<doc>This is the volume of groceries bought by A and B last week.
+
+Explanation:
+This is to form part ofthe mechanism by which A and B assess the remaining fridge capacity, looks at their previous spending, and then chooses to buy more groceries to increase their gains through fridge utilisation. </doc>
+				<eqn>DELAY(groceries_to_buy_for_A_and_B,6, 0)</eqn>
+				<isee:delay_aux/>
+				<units>liter</units>
+			</aux>
+			<aux name="necessary groceries\nfor 1 person/week">
+				<doc>This is the default, necessary groceries for 1 roommate for the week. This is the starting value for A and B&apos;s grocerie purchases. </doc>
+				<eqn>40</eqn>
+				<units>liter</units>
+			</aux>
+			<aux name="additional groceries\nto buy">
+				<doc>This is the amount of additional groceries that A and B will buy as compared to last week. </doc>
+				<eqn>last_week_remaining_capacity*(percentage_of_remaining_capacity_that_the_roommate_will_buy/100)</eqn>
+				<units>liter</units>
+			</aux>
+			<aux name="last week remaining\ncapacity">
+				<doc>This is a remaining capacity of the fridge last week. 
+
+Explanation:
+This is to form part of the mechanism mentioned in &apos;groceries bought for A and B last week&apos;, and allows the remaining capacity of the fridge after grocerie shopping last week to figure into the calculation for how many more groceries that A and B will buy to improve their gains through fridge utilisation. </doc>
+				<eqn>DELAY(remaining_capacity_in_fridge, 6, fridge_capacity)</eqn>
+				<isee:delay_aux/>
+				<units>liter</units>
+			</aux>
+			<aux name="remaining capacity\nin fridge">
+				<doc>This is the remaining capacity in the fridge for more groceries. </doc>
+				<eqn>fridge_capacity-Groceries_in_Fridge</eqn>
+				<units>liter</units>
+			</aux>
+			<aux name="percentage of remaining capacity\nthat the roommate will buy">
+				<doc>This is the percentage of the remaining </doc>
+				<eqn>10</eqn>
+			</aux>
+		</variables>
+		<views>
+			<style color="black" background="white" font_style="normal" font_weight="normal" text_decoration="none" text_align="center" vertical_text_align="center" font_color="black" font_family="Arial" font_size="10pt" padding="2" border_color="black" border_width="thin" border_style="none">
+				<text_box color="black" background="white" text_align="left" vertical_text_align="top" font_family="Arial" font_size="12pt"/>
+				<numeric_display color="blue" background="white" font_family="Arial" font_size="9pt" isee:transparent="false"/>
+				<graph color="black" background="white" font_family="Arial" font_size="12pt" axis_color="#666666" grid_color="#C8C8C8" legend_position="bottom" isee:transparent="false" axis_label_font_size="9pt"/>
+				<table color="black" background="#E0E0E0" text_align="right" font_family="Arial" font_size="12pt" orientation="vertical" wrap_text="false" isee:auto_fit="true" isee:use_alternate_row_colors="false" isee:unlimited_table_length="false" blank_column_width="80" column_width="160" isee:report_month_names="false" interval="1" report_balances="beginning" report_flows="instantaneous" header_text_align="center"/>
+				<button color="black" background="#E0E0E0" font_family="Arial" font_size="12pt" transparent="false" corner_radius="0" icon_side="top"/>
+				<isee:annotation color="black" background="#E0E0E0" font_family="Arial" font_size="12pt" transparent="false" corner_radius="0" icon_side="top" popup_background_color="#FFFECF" popup_text_align="left" popup_vertical_text_align="top"/>
+				<slider color="black" background="#E0E0E0" font_family="Arial" font_size="12pt" num_ticks="3" label_side="top" wrap_title="true" input_expands="true" input_width="100"/>
+				<knob color="#66CC66" background="#E0E0E0" font_family="Arial" font_size="12pt" label_side="bottom" wrap_title="true"/>
+				<numeric_input color="black" background="#E0E0E0" font_family="Arial" font_size="12pt" label_side="left" wrap_title="true" input_expands="false" input_width="100"/>
+				<switch color="black" background="#E0E0E0" font_family="Arial" font_size="12pt" label_side="top" wrap_title="true"/>
+				<options color="black" background="white" font_family="Arial" appearance="radio-buttons" arrangement="vertical"/>
+				<graphical_input color="black" background="#E0E0E0" font_family="Arial" font_size="12pt"/>
+				<group_input color="black" background="#E0E0E0" font_family="Arial" font_size="12pt"/>
+				<lamp color="black" background="white" font_family="Arial" font_size="9pt"/>
+			</style>
+			<view isee:show_pages="false" page_width="1009" page_height="769" isee:page_cols="2" isee:page_rows="2" zoom="80" isee:popup_graphs_are_comparative="true" type="stock_flow">
+				<style color="black" background="white" font_style="normal" font_weight="normal" text_decoration="none" text_align="center" vertical_text_align="center" font_color="black" font_family="Arial" font_size="10pt" padding="2" border_color="black" border_width="thin" border_style="none">
+					<stock color="blue" background="white" font_color="blue" font_family="Arial" font_size="12pt" label_side="top" label_angle="0">
+						<shape type="rectangle" width="45" height="35"/>
+					</stock>
+					<flow color="blue" background="white" font_color="blue" font_family="Arial" font_size="12pt" label_side="bottom" label_angle="0"/>
+					<module color="blue" background="white" font_color="blue" font_family="Arial" font_size="12pt" label_side="top" label_angle="0">
+						<shape type="rectangle" width="55" height="45"/>
+					</module>
+					<aux color="blue" background="white" font_color="blue" font_family="Arial" font_size="12pt" label_side="bottom" label_angle="0">
+						<shape type="circle" radius="18"/>
+					</aux>
+					<group color="red" background="white" font_color="red" font_family="Arial" font_size="9pt"/>
+					<connector color="#FF007F" background="white" font_color="#FF007F" font_family="Arial" font_size="9pt" isee:thickness="1"/>
+					<text_box color="black" background="white" text_align="left" vertical_text_align="top" font_family="Arial" font_size="12pt"/>
+					<numeric_display color="blue" background="white" font_family="Arial" font_size="9pt" isee:transparent="false"/>
+					<graph color="black" background="white" font_family="Arial" font_size="12pt" axis_color="#666666" grid_color="#C8C8C8" legend_position="bottom" isee:transparent="false" axis_label_font_size="9pt"/>
+					<table color="black" background="#E0E0E0" text_align="right" font_family="Arial" font_size="12pt" orientation="vertical" wrap_text="false" isee:auto_fit="true" isee:use_alternate_row_colors="false" isee:unlimited_table_length="false" blank_column_width="80" column_width="160" isee:report_month_names="false" interval="1" report_balances="beginning" report_flows="instantaneous" header_text_align="center"/>
+				</style>
+				<stock color="black" font_color="black" font_family="Arial" label_side="bottom" label_angle="270" x="441.75" y="281" width="100" height="60" name="Groceries in Fridge"/>
+				<flow color="black" font_color="black" font_family="Arial" label_side="top" label_angle="90" x="595" y="293.25" name="consumption">
+					<pts>
+						<pt x="541.75" y="293.25"/>
+						<pt x="672.25" y="293.25"/>
+					</pts>
+				</flow>
+				<aux color="black" font_color="black" font_family="Arial" label_side="top" label_angle="90" x="678.125" y="243.5" name="maximum\nconsumption rate/day"/>
+				<connector uid="1" font_family="Arial" angle="225.603">
+					<from>&quot;maximum_consumption_rate/day&quot;</from>
+					<to>consumption</to>
+				</connector>
+				<flow color="black" font_color="black" font_family="Arial" label_side="bottom" label_angle="270" x="581.688" y="335.5" name="Waste">
+					<pts>
+						<pt x="541.75" y="335.5"/>
+						<pt x="621.625" y="335.5"/>
+						<pt x="621.625" y="459"/>
+					</pts>
+				</flow>
+				<stock color="black" font_color="black" font_family="Arial" label_side="bottom" label_angle="270" x="621.625" y="476.5" name="Total Groceries Wasted"/>
+				<aux color="blue" font_family="Arial" label_side="right" label_angle="315" x="341.5" y="163.5" name="fridge capacity"/>
+				<flow color="#005500" font_color="#005500" font_family="Arial" label_side="top" label_angle="90" x="341.5" y="293.25" name="A's grocerie purchases">
+					<pts>
+						<pt x="241.25" y="293.25"/>
+						<pt x="441.75" y="293.25"/>
+					</pts>
+				</flow>
+				<flow color="#005500" font_color="#005500" font_family="Arial" x="341" y="332.5" name="B's grocerie purchases">
+					<pts>
+						<pt x="240.25" y="332.5"/>
+						<pt x="441.75" y="332.5"/>
+					</pts>
+				</flow>
+				<aux color="#005500" font_color="#005500" font_family="Arial" label_side="left" label_angle="225" x="148.75" y="293.5" width="35" height="35" name="groceries to buy\nfor A and B"/>
+				<connector uid="2" font_family="Arial" angle="5.78342">
+					<from>groceries_to_buy_for_A_and_B</from>
+					<to>A&apos;s_grocerie_purchases</to>
+				</connector>
+				<connector uid="3" font_family="Arial" angle="352.986">
+					<from>groceries_to_buy_for_A_and_B</from>
+					<to>B&apos;s_grocerie_purchases</to>
+				</connector>
+				<aux color="#005500" font_color="#005500" font_family="Arial" label_side="bottom" label_angle="270" x="303.75" y="450" name="groceries bought\nfor A and B last week"/>
+				<aux color="black" font_color="black" font_family="Arial" label_side="top" label_angle="90" x="166.25" y="233.5" name="necessary groceries\nfor 1 person/week"/>
+				<connector uid="4" font_family="Arial" angle="270">
+					<from>&quot;necessary_groceries_for_1_person/week&quot;</from>
+					<to>groceries_to_buy_for_A_and_B</to>
+				</connector>
+				<connector uid="5" font_family="Arial" angle="134.689">
+					<from>groceries_bought_for_A_and_B_last_week</from>
+					<to>groceries_to_buy_for_A_and_B</to>
+				</connector>
+				<connector uid="6" font_family="Arial" angle="220.086">
+					<from>fridge_capacity</from>
+					<to>groceries_to_buy_for_A_and_B</to>
+				</connector>
+				<aux color="#005500" font_color="#005500" font_family="Arial" label_side="top" label_angle="90" x="65.5" y="186.5" name="additional groceries\nto buy"/>
+				<connector uid="7" font_family="Arial" angle="308.981">
+					<from>additional_groceries_to_buy</from>
+					<to>groceries_to_buy_for_A_and_B</to>
+				</connector>
+				<aux color="#005500" font_color="#005500" font_family="Arial" label_side="top" label_angle="90" x="285.75" y="122.5" name="last week remaining\ncapacity"/>
+				<connector uid="8" font_family="Arial" angle="143.668">
+					<from>fridge_capacity</from>
+					<to>last_week_remaining_capacity</to>
+				</connector>
+				<connector uid="9" font_family="Arial" angle="164.805">
+					<from>last_week_remaining_capacity</from>
+					<to>additional_groceries_to_buy</to>
+				</connector>
+				<stacked_container uid="10" x="944.25" y="142.25">
+					<graph font_family="Arial" axis_label_font_size="9pt" x="769.25" y="17.25" width="350" height="250" type="time_series" show_grid="false" include_units_in_legend="false" plot_numbers="false" num_x_grid_lines="0" num_y_grid_lines="0" num_x_labels="5" num_y_labels="3" title="Graph" left_axis_multi_scale="false" left_axis_auto_scale="true" right_axis_multi_scale="false" right_axis_auto_scale="true">
+						<plot color="blue" pen_width="1" index="0" show_y_axis="true">
+							<entity name="Groceries_in_Fridge"/>
+						</plot>
+					</graph>
+				</stacked_container>
+				<connector uid="11" font_family="Arial" angle="270">
+					<from>groceries_to_buy_for_A_and_B</from>
+					<to>groceries_bought_for_A_and_B_last_week</to>
+				</connector>
+				<stacked_container uid="12" x="944.25" y="400.75">
+					<graph font_family="Arial" axis_label_font_size="9pt" x="769.25" y="275.75" width="350" height="250" type="time_series" show_grid="false" include_units_in_legend="false" plot_numbers="false" num_x_grid_lines="0" num_y_grid_lines="0" num_x_labels="5" num_y_labels="3" title="Graph" left_axis_multi_scale="false" left_axis_auto_scale="true" right_axis_multi_scale="false" right_axis_auto_scale="true">
+						<plot color="blue" pen_width="1" index="0" show_y_axis="true">
+							<entity name="Waste"/>
+						</plot>
+						<plot color="red" pen_width="1" index="1" show_y_axis="true">
+							<entity name="A's_grocerie_purchases"/>
+						</plot>
+					</graph>
+				</stacked_container>
+				<stacked_container uid="13" x="1302.25" y="142.25">
+					<graph font_family="Arial" axis_label_font_size="9pt" x="1127.25" y="17.25" width="350" height="250" type="time_series" show_grid="false" include_units_in_legend="false" plot_numbers="false" num_x_grid_lines="0" num_y_grid_lines="0" num_x_labels="5" num_y_labels="3" title="Graph" left_axis_multi_scale="false" left_axis_auto_scale="true" right_axis_multi_scale="false" right_axis_auto_scale="true">
+						<plot color="blue" pen_width="1" index="0" show_y_axis="true">
+							<entity name="Total_Groceries_Wasted"/>
+						</plot>
+					</graph>
+				</stacked_container>
+				<aux font_family="Arial" label_side="top" label_angle="90" x="501.75" y="145.5" name="remaining capacity\nin fridge"/>
+				<connector uid="14" font_family="Arial" angle="6.40886">
+					<from>fridge_capacity</from>
+					<to>remaining_capacity_in_fridge</to>
+				</connector>
+				<connector uid="15" font_family="Arial" angle="86.5422">
+					<from>Groceries_in_Fridge</from>
+					<to>remaining_capacity_in_fridge</to>
+				</connector>
+				<connector uid="16" font_family="Arial" angle="151.39">
+					<from>remaining_capacity_in_fridge</from>
+					<to>last_week_remaining_capacity</to>
+				</connector>
+				<stacked_container uid="17" x="1302.25" y="400.75">
+					<graph font_family="Arial" axis_label_font_size="9pt" x="1127.25" y="275.75" width="350" height="250" type="time_series" show_grid="false" include_units_in_legend="false" plot_numbers="false" num_x_grid_lines="0" num_y_grid_lines="0" num_x_labels="5" num_y_labels="3" title="Graph" left_axis_multi_scale="false" left_axis_auto_scale="true" right_axis_multi_scale="false" right_axis_auto_scale="true">
+						<plot color="blue" pen_width="1" index="0" show_y_axis="true">
+							<entity name="remaining_capacity_in_fridge"/>
+						</plot>
+						<plot color="red" pen_style="dot_dashed" pen_width="1" index="1" show_y_axis="true">
+							<entity name='"necessary_groceries_for_1_person/week"'/>
+						</plot>
+					</graph>
+				</stacked_container>
+				<aux color="black" font_color="black" font_family="Arial" label_side="top" label_angle="90" x="170.75" y="64.5" name="percentage of remaining capacity\nthat the roommate will buy"/>
+				<connector uid="18" font_family="Arial" angle="233.569">
+					<from>percentage_of_remaining_capacity_that_the_roommate_will_buy</from>
+					<to>additional_groceries_to_buy</to>
+				</connector>
+				<text_box font_family="Arial" uid="19" x="57.438" y="545.25" width="203" height="85">Please Note!!
+The model DT is kept at 1 due to time-dependent conditions that make the model not work at higher levels of granularity. </text_box>
+			</view>
+		</views>
+	</model>
+	<isee:controls>
+		<isee:control priority="interactive" name="percentage_of_remaining_capacity_that_the_roommate_will_buy" value="10"/>
+		<isee:control priority="interactive" name="fridge_capacity" value="200"/>
+	</isee:controls>
+</xmile>
+
